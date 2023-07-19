@@ -95,7 +95,12 @@ TerminalEmulator class >> environ [
 
 { #category : #accessing }
 TerminalEmulator class >> font [
-	font ifNil: [ font := LogicalFont familyName: 'DejaVu Sans Mono' pointSize: 10 ].
+	font ifNil: [ 
+		font := StandardFonts codeFont.
+		font isMonospace ifFalse:[
+			font := LogicalFont familyName: 'DejaVu Sans Mono' pointSize: font pointSize.  
+		].
+	].
 	^ font
 ]
 
