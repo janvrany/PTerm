@@ -1,0 +1,20 @@
+GNUmakefile.local
+
+makefiles
+3rdparty
+
+# Pharo
+pharo/pharo*
+pharo/Pharo*
+pharo/icon-packs
+pharo/progress.log
+pharo/*.image
+pharo/*.changes
+pharo/*Test.xml
+pharo/bin
+pharo/lib
+pharo/Pharo*.zip
+pharo/crash.dmp
+
+# git merge by-products
+*.orig
