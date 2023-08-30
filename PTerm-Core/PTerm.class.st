@@ -106,10 +106,16 @@ PTerm >> pid [
 
 { #category : #protocol }
 PTerm >> run [
+	| reader |
+	
 	sub := self announcer when: PTermDataEvent  do: [ :e|
 		e data do:[:c|
 			up upcall: c codePoint ]].
-	[ self waitForOutput ] forkAt: Processor userSchedulingPriority
+	
+	reader := [ self waitForOutput ] newProcess.
+	reader name:'PTerm reader - ', (LibPTerm uniqueInstance ptsname: master).
+	reader priority: Processor userSchedulingPriority.
+	reader resume.
 
 ]
 
