@@ -20,15 +20,25 @@ PTerm >> announcer [
 
 { #category : #protocol }
 PTerm >> close [
-
-	self master ifNotNil: [
+	| fd |
+	
+	fd := self master.
+	fd ifNotNil: [		
+		"Terminate the shell (or other child process) if any."
 		usedFallback ifFalse: [
 			pid ifNotNil: [ 
 				self lib kill: pid signal: self lib class SIGHUP ]
 		] ifTrue: [
 			self nextPutAllCr: 'exit'.
 			pid ifNotNil: [ 
-				self lib kill: pid signal: self lib class SIGKILL ] ] ]
+				self lib kill: pid signal: self lib class SIGKILL ] ].
+		
+		"...and then close PTY, but only if it belonged to the child."
+		pid notNil ifTrue:[		
+			self lib closept: fd.						
+		].
+		master := nil. 
+		].
 ]
 
 { #category : #accessing }
@@ -173,23 +183,30 @@ PTerm >> waitForOutput [
 	status := FFIUInt32  newBuffer.
 	data := #[].
 	buff := self lib getReadWriteBufferOf: 2048.
-	[ 
-		count := self lib read: self master buffer: buff  size: 2048.
-		count > 0 ifTrue:[ 
-			data := data , (FFIExternalArray fromHandle: buff type: 'uint8' size: count) asByteArray.
-			stream := data readStream.
-			self announcer announce: (PTermDataEvent data: (PTermUTF8Encoder new decodeStreamUpToIncomplete: stream)).
-			data := data copyFrom: stream position + 1 to: data size.
+	[
+		| fd |
+		
+		fd := master. 
+		fd notNil ifTrue:[
+			count := self lib read: fd buffer: buff  size: 2048.
+			count > 0 ifTrue:[ 
+				data := data , (FFIExternalArray fromHandle: buff type: 'uint8' size: count) asByteArray.
+				stream := data readStream.
+				self announcer announce: (PTermDataEvent data: (PTermUTF8Encoder new decodeStreamUpToIncomplete: stream)).
+				data := data copyFrom: stream position + 1 to: data size.
+			].
 		].
 		self pid ifNotNil: [ 
-			ws := self lib waitpid: self pid status: status noHang: 1
+			ws := self lib waitpid: self pid status: status noHang: 1.
+			ws > 0 ifTrue:[
+				self lib closept: fd.
+				master := nil.
+			].
 		].
-	ws = 0
+	ws = 0 and:[master notNil].
 	] whileTrue: [ count > 0 ifFalse:[ 100 milliSeconds wait ]].
 	active := false.
-	self lib closept: self master.
-	self announcer unsubscribe: sub.
-	master := nil.
+	self announcer unsubscribe: sub.	
 	up note: #endpointClosed with: true.
 	wbuff isNull ifFalse: [ wbuff free; beNull ].
 	Transcript  show: 'Terminal closed'; cr.
